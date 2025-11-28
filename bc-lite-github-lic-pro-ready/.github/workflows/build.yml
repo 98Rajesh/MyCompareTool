@@ -1,0 +1,50 @@
+name: Build
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*.*.*'
+  push:
+    branches:
+      - main
+      - pro
+
+jobs:
+  build-binaries:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      # Decide edition based on branch
+      BC_LITE_EDITION: ${{ github.ref_name == 'pro' && 'pro' || 'lite' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
+        run: |
+          if [ "${{ env.BC_LITE_EDITION }}" = "pro" ]; then
+            NAME="BC-Lite-Pro"
+          else
+            NAME="BC-Lite"
+          fi
+          echo "Building edition: $BC_LITE_EDITION as $NAME"
+          pyinstaller --noconfirm --name "$NAME" --onefile --windowed app/main.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bc-lite-${{ env.BC_LITE_EDITION }}-${{ matrix.os }}
+          path: dist/
